@@ -9,11 +9,16 @@ class JournalEntry extends Component {
         return (
             <div className="journal-entry">
                 <h1></h1>
-                <Moment>{this.props.date_time*1000}</Moment>
-                <div>{this.props.entry}</div>
+                <Moment fromNow>{this.props.created_at}</Moment>
+                <div>{this.props.deets}</div>
                 <div>{this.props.mood}</div>
+                <JournalEntryRemoveConfirmation onDelete={this._handleDelete.bind(this)} />
             </div>
         )
+    }
+
+    _handleDelete() {
+        this.props.onDelete(this.props.id);
     }
 }
 
@@ -23,7 +28,7 @@ class JournalEntryForm extends Component{
             <label>Add an entry</label>
             <div className="journal-entry-form-fields">
                 <input placeholder="Mood:" ref={(input) => this._mood = input} />
-                <textarea placeholder="Entry:" ref={(input) => this._entry = input}></textarea>
+                <textarea placeholder="Deets:" ref={(input) => this._deets = input}></textarea>
             </div>
             <div className="journal-entry-form-actions">
                 <button type="submit">
@@ -35,10 +40,9 @@ class JournalEntryForm extends Component{
 
     _handleSubmit(event){
         event.preventDefault();
-        let date_time = (new Date().getTime()) / 1000;
         let mood = this._mood;
-        let entry = this._entry
-        this.props.addEntry(date_time, mood.value, entry.value);
+        let deets = this._deets
+        this.props.addEntry(mood.value, deets.value);
     }
 }
 
@@ -84,18 +88,25 @@ class JournalEntryBox extends Component {
     }
     _getJournalEntries(){
         return this.state.entries.map((entry) => {
-            return (<JournalEntry key={entry.id} date_time={entry.date_time} entry={entry.entry} mood={entry.mood}  /> )
+            return (<JournalEntry
+                        key={entry.id}
+                        id={entry.id}
+                        created_at={entry.createdAt}
+                        deets={entry.deets}
+                        mood={entry.mood}
+                        onDelete={this._removeEntry.bind(this)}
+            /> )
         })
     }
 
-    _addEntry(date_time,mood, entry){
+    _addEntry(mood, deets){
         const post = {
-            date_time,
             mood,
-            entry
+            deets
         };
         this._postEntry(post).done((data) => {
-            this.setState({entries: this.state.entries.concat([data])});
+           //data = JSON.parse(data);
+           this.setState({entries: this.state.entries.concat([data])});
         })
     }
 
@@ -104,6 +115,23 @@ class JournalEntryBox extends Component {
             method: 'POST',
             url: 'http://192.168.29.101:8080/journal_entries',
             data: entry
+        });
+    }
+
+    _removeEntry(entryID){
+        const entries = this.state.entries.filter(
+            entry => entry.id !== entryID
+        );
+
+        this._destroyEntry(entryID).done(() => {
+            this.setState({ entries });
+        });
+    }
+
+    _destroyEntry(entryID){
+        return $.ajax({
+            method: 'DELETE',
+            url: `http://192.168.29.101:8080/journal_entries/${entryID}`,
         });
     }
 
@@ -118,6 +146,51 @@ class JournalEntryBox extends Component {
                 </div>
             </div>
         )
+    }
+}
+
+class JournalEntryRemoveConfirmation extends React.Component {
+    constructor() {
+        super();
+
+        this.state = {
+            showConfirm: false
+        };
+    }
+
+    render() {
+
+        let confirmNode;
+
+        if (this.state.showConfirm) {
+            return (
+                <span>
+          <a href="" onClick={this._confirmDelete.bind(this)}>Yes </a> - or - <a href="" onClick={this._toggleConfirmMessage.bind(this)}> No</a>
+        </span>
+            );
+        } else {
+            confirmNode = <a href="" onClick={this._toggleConfirmMessage.bind(this)}>Delete entry?</a>;
+        }
+
+        return (
+            <span>
+        {confirmNode}
+      </span>
+        );
+    }
+
+    _toggleConfirmMessage(e) {
+        e.preventDefault();
+
+        this.setState({
+            showConfirm: !this.state.showConfirm
+        });
+
+    }
+
+    _confirmDelete(e) {
+        e.preventDefault();
+        this.props.onDelete();
     }
 }
 
